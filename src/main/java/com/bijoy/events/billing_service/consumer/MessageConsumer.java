@@ -14,36 +14,31 @@ import org.springframework.stereotype.Service;
 @Service
 public class MessageConsumer {
     private final Logger LOGGER = LoggerFactory.getLogger(getClass());
-    private final PatientService patientService;
+    private final PatientService PATIENT_SERVICE;
 
     public MessageConsumer(PatientService patientService) {
-        this.patientService = patientService;
+        this.PATIENT_SERVICE = patientService;
     }
 
     @RabbitListener(queues = {"${patient.charge.queue.name}"})
     public void consumerPatientCharge(PatientChargeDTO patientChargeDTO) {
         LOGGER.info("Charge details received for patient: {}", patientChargeDTO.getSso());
         try {
-            Patient patient = patientService.findPatientBySso(patientChargeDTO.getSso());
+            Patient patient = PATIENT_SERVICE.findPatientBySso(patientChargeDTO.getSso());
             Charge charge = new Charge();
             charge.setCost(patientChargeDTO.getCost());
             charge.setTest(patientChargeDTO.getTest());
             patient.getCharges().add(charge);
             patient.setTotalCharge(patient.getTotalCharge() + charge.getCost());
-            patientService.updatePatient(patient);
+            PATIENT_SERVICE.updatePatient(patient);
         } catch (PatientNotFoundException ex) {
             LOGGER.info("No patient found with sso: {}", patientChargeDTO.getSso());
         }
     }
 
     @RabbitListener(queues = {"${patient.creation.queue.name}"})
-    public void consumerPatientDetails(Object patientDetails) {
-        if (patientDetails instanceof PatientCreationDTO) {
-            LOGGER.info("Patient creation request received: {}", ((PatientCreationDTO) patientDetails).getSso());
-            patientService.savePatient((PatientCreationDTO) patientDetails);
-        } else if (patientDetails instanceof PatientChargeDTO) {
-            LOGGER.info("Patient charge details received for patient: {}", ((PatientChargeDTO) patientDetails).getSso());
-            ;
-        }
+    public void consumerPatientDetails(PatientCreationDTO patientCreationDTO) {
+        LOGGER.info("Patient creation request received: {}", patientCreationDTO.getSso());
+        PATIENT_SERVICE.savePatient(patientCreationDTO);
     }
 }
